@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PageChat</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="brand"><strong>PageChat</strong><span id="page-chip" class="page-chip">Ready when you are</span></div>
+      <div class="header-actions">
+        <button id="refresh" class="icon-button" title="Refresh page data" aria-label="Refresh page data">↻</button>
+        <button id="settings" class="icon-button" title="Backend settings" aria-label="Backend settings">⚙</button>
+      </div>
+    </header>
+    <section class="settings-row" id="settings-row" hidden>
+      <label for="backend-url">Backend URL</label><input id="backend-url" type="url" placeholder="http://localhost:8000">
+      <button id="save-settings">Save</button>
+    </section>
+    <nav id="chips" class="chips" aria-label="Quick questions"></nav>
+    <section id="chat" class="chat" aria-live="polite">
+      <div class="empty-state"><strong>What is going on here?</strong><p>Ask about the page you have open. Page text stays on this computer until you ask a question.</p><ul><li>Give me the short version</li><li>What should I pay attention to?</li><li>What are the pros and cons?</li></ul></div>
+    </section>
+    <div class="review-option"><label><input id="more-reviews" type="checkbox"> Include more reviews</label><span>May take a moment on some stores</span></div>
+    <div class="input-wrap">
+      <textarea id="question" rows="1" placeholder="Ask about this page…" aria-label="Your question"></textarea>
+      <button id="send" class="send-button" disabled>Send</button>
+      <button id="stop" class="send-button stop-button" hidden>Stop</button>
+    </div>
+    <footer>Page text is sent to the server only when you ask. <button id="clear-chat">Clear chat</button></footer>
+  </main>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
