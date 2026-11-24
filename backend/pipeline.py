@@ -24,7 +24,10 @@ def build_docs(payload):
     structured = payload.get("structured") or {}
     for key, value in structured.items():
         if isinstance(value, list):
-            value = "\n".join(map(str, value))
+            if key == "reviews":
+                value = "\n".join(f"Reviews excerpt {index}: {item}" for index, item in enumerate(value, 1))
+            else:
+                value = "\n".join(map(str, value))
         elif isinstance(value, dict):
             value = "\n".join(f"{k}: {v}" for k, v in value.items())
         parts.append(f"{key}: {value}")
@@ -74,6 +77,10 @@ def _rank_chunks(chunks, question, limit):
             if frequency:
                 inverse_frequency = math.log(1 + len(chunks) / (1 + document_frequency[term]))
                 score += (1 + math.log(frequency)) * inverse_frequency
+        if query_terms.intersection({"negative", "negatives", "complaint", "complaints", "bad", "worst"}):
+            if re.search(r"\b[1-2](?:\.\d)?\s*(?:out of 5|/\s*5)\b", chunk.page_content, re.I):
+                score += 8
+            score += sum(counts.get(term, 0) for term in {"bad", "poor", "broken", "waste", "disappointed", "returned", "refund", "defect", "issue", "problem"})
         scored.append((score, -index, chunk))
     return [item[2] for item in sorted(scored, reverse=True)[:limit]]
 

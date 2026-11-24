@@ -98,15 +98,15 @@ function updateChips() {
   }
 }
 
-async function extract(force = false, tabId = null) {
+async function extract(force = false, tabId = null, includeMoreReviews = $("more-reviews").checked) {
   await syncActivePage(tabId);
-  if (page && !force && (!$("more-reviews").checked || pageIncludesMoreReviews)) return page;
+  if (page && !force && (!includeMoreReviews || pageIncludesMoreReviews)) return page;
   setStatus("Reading page…");
-  const result = await chrome.runtime.sendMessage({ type: "EXTRACT", tabId: currentTabId, moreReviews: $("more-reviews").checked });
+  const result = await chrome.runtime.sendMessage({ type: "EXTRACT", tabId: currentTabId, moreReviews: includeMoreReviews });
   if (result?.blocked) throw new Error(result.reason || "PageChat cannot read this page.");
   if (result?.error) throw new Error(result.error);
   page = result;
-  pageIncludesMoreReviews = $("more-reviews").checked;
+  pageIncludesMoreReviews = includeMoreReviews;
   if (!page.fallback_text?.trim() && !Object.values(page.structured || {}).some((value) => Array.isArray(value) ? value.length : value)) {
     page = null;
     throw new Error("This page has no readable text. Try refreshing the page or opening a different page.");
@@ -189,7 +189,8 @@ async function ask(rawQuestion) {
   const pending = addMessage("bot", "");
   pending.bubble.innerHTML = '<span class="dots" aria-label="Thinking"><i></i><i></i><i></i></span>';
   try {
-    const data = await extract();
+    const wantsReviews = /\b(?:reviews?|complaints?)\b/i.test(asked);
+    const data = await extract(wantsReviews && !pageIncludesMoreReviews, null, $("more-reviews").checked || wantsReviews);
     const backend = await backendUrl();
     const payload = { ...data, question: asked, history: historyForRequest() };
     payload.structured = { ...payload.structured };

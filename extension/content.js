@@ -25,6 +25,20 @@
     try { return [...document.querySelectorAll(selector)].map((node) => node.innerText?.trim()).filter(Boolean); }
     catch { return []; }
   };
+  const collectReviews = (root, sels) => {
+    if (sels?.reviewCard && sels?.reviewText) {
+      const cards = [...root.querySelectorAll(sels.reviewCard)];
+      const reviews = cards.map((card) => {
+        const body = [...card.querySelectorAll(sels.reviewText)].map((node) => node.innerText?.trim()).filter(Boolean).join(" ");
+        const rating = sels.reviewRating ? card.querySelector(sels.reviewRating)?.innerText?.trim() : "";
+        return body ? `${rating ? `Rating: ${rating}. ` : ""}${body}` : "";
+      }).filter(Boolean);
+      if (reviews.length) return [...new Set(reviews)];
+    }
+    try {
+      return [...new Set([...root.querySelectorAll(sels?.reviews || "")].map((node) => node.innerText?.trim()).filter(Boolean))];
+    } catch { return []; }
+  };
   const value = (selector) => text(selector)[0] || "";
   const select = (sels, key) => sels?.[key] ? text(sels[key]) : [];
   const jsonData = () => [...document.querySelectorAll('script[type="application/ld+json"]')].flatMap((node) => {
@@ -66,11 +80,8 @@
         const response = await fetch(link.href, { credentials: "include" });
         const html = await response.text();
         const parsed = new DOMParser().parseFromString(html, "text/html");
-        const selector = sels?.reviews;
-        if (selector) {
-          const more = [...parsed.querySelectorAll(selector)].map((node) => node.innerText?.trim()).filter(Boolean);
-          window.__pageChatMoreReviews = [...(window.__pageChatMoreReviews || []), ...more];
-        }
+        const more = collectReviews(parsed, sels);
+        window.__pageChatMoreReviews = [...new Set([...(window.__pageChatMoreReviews || []), ...more])];
       } catch { /* Some sites prevent review-page requests. */ }
       await new Promise((r) => setTimeout(r, 1000));
     }
@@ -79,19 +90,36 @@
     const site = detectSite();
     const sels = globalThis.PAGECHAT_SELECTORS?.[site] || {};
     if (sels.title) await waitFor(sels.title, 1200);
+    if (site === "amazon" && sels.reviewCard) {
+      if (moreReviews && !document.querySelector(sels.reviewCard)) {
+        const reviewSection = document.querySelector("#reviewsMedley, #customerReviews_feature_div, #reviews");
+        if (reviewSection) {
+          const previousScroll = window.scrollY;
+          reviewSection.scrollIntoView({ block: "center" });
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          window.scrollTo(0, previousScroll);
+        }
+      }
+      await waitFor(sels.reviewCard, moreReviews ? 2500 : 1800);
+    }
     const jsonld = jsonData();
     if (moreReviews) await loadMoreReviews(sels);
     const entries = flatten(jsonld);
     const product = entries.find((x) => /product/i.test(String(x['@type'] || ""))) || {};
     const movie = entries.find((x) => /movie|tvseries/i.test(String(x['@type'] || ""))) || {};
     const article = entries.find((x) => /article|newsarticle/i.test(String(x['@type'] || ""))) || {};
+    const jsonReviews = (Array.isArray(product.review) ? product.review : product.review ? [product.review] : []).map((review) => {
+      const body = review.reviewBody || review.description || "";
+      const rating = review.reviewRating?.ratingValue;
+      return body ? `${rating ? `Rating: ${rating} out of 5. ` : ""}${body}` : "";
+    }).filter(Boolean);
     const structured = {
       title: value(sels.title) || product.name || movie.name || article.headline || document.title,
       price: value(sels.price) || product.offers?.price || product.offers?.[0]?.price || "",
       rating: value(sels.rating) || product.aggregateRating?.ratingValue || movie.aggregateRating?.ratingValue || "",
       critic_score: value(sels.criticScore), synopsis: value(sels.synopsis) || movie.description || "",
       specs: select(sels, "bullets").concat(select(sels, "specs")),
-      reviews: select(sels, "reviews").concat(window.__pageChatMoreReviews || []).slice(0, 30)
+      reviews: [...new Set(collectReviews(document, sels).concat(jsonReviews, window.__pageChatMoreReviews || []))].slice(0, 30)
     };
     const pageType = detectPageType(site, jsonld, sels) || (article && "article") || "other";
     const parsed = globalThis.Readability ? new globalThis.Readability(document.cloneNode(true)).parse() : null;

@@ -1,7 +1,11 @@
 globalThis.PAGECHAT_SELECTORS = {
   amazon: {
     title: "#productTitle", price: ".a-price .a-offscreen", rating: "#acrCustomerReviewText",
-    bullets: "#feature-bullets li", reviews: '[data-hook="review-body"]',
+    bullets: "#feature-bullets li",
+    reviewCard: '[data-hook="review"]',
+    reviewText: '[data-hook="review-body"], [data-hook="review-collapsed"], .review-text-content',
+    reviewRating: '[data-hook="review-star-rating"] .a-icon-alt, [data-hook="cmps-review-star-rating"] .a-icon-alt',
+    reviews: '[data-hook="review-body"], [data-hook="review-collapsed"], .review-text-content',
     addToCart: "#add-to-cart-button"
   },
   flipkart: {
