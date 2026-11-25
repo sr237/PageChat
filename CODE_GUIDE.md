@@ -1,6 +1,6 @@
 # PageChat Code Guide
 
-This guide explains what the files and functions in this repository do in plain English. It also separates **fixed choices** (values written directly in the code) from **runtime logic** (what the code decides after it sees a page or question).
+This guide explains what the files and functions in this repository do . It also separates **fixed choices** (values written directly in the code) from **runtime logic** (what the code decides after it sees a page or question).
 
 ## The whole flow
 
