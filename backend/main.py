@@ -31,6 +31,7 @@ class ChatPayload(BaseModel):
     page_type: str = "other"
 
 
+# Converts the request's page content into a searchable document, if possible.
 def _doc_or_error(payload):
     doc = build_docs(payload.model_dump())
     if not doc:
@@ -38,11 +39,13 @@ def _doc_or_error(payload):
     return doc
 
 
+# Reports that the local PageChat API is responding.
 @app.get("/health")
 def health():
     return {"ok": True}
 
 
+# Answers a page question and streams the model's response to the extension.
 @app.post("/chat")
 def chat(payload: ChatPayload):
     doc = _doc_or_error(payload)
@@ -58,6 +61,7 @@ def chat(payload: ChatPayload):
     except Exception as exc:
         return JSONResponse(status_code=503, content={"error": str(exc) or "The page assistant is temporarily unavailable."})
 
+    # Streams the generated model chunks as plain text for the extension UI.
     def generate():
         try:
             for chunk in chain((first_chunk,), chunks):
@@ -73,6 +77,7 @@ def chat(payload: ChatPayload):
     return StreamingResponse(generate(), media_type="text/plain; charset=utf-8", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+# Creates a short summary of the supplied page using the local model.
 @app.post("/summarize")
 def summarize_page(payload: ChatPayload):
     doc = _doc_or_error(payload)

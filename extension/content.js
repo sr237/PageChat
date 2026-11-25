@@ -1,4 +1,5 @@
 (() => {
+  // Watches page changes so single-page sites can notify the extension of URL updates.
   if (!globalThis.__pageChatUrlWatcherInstalled) {
     globalThis.__pageChatUrlWatcherInstalled = true;
     let observedUrl = location.href, urlCheckTimer = null;
@@ -16,15 +17,18 @@
     addEventListener("hashchange", notifyIfUrlChanged);
   }
 
+  // Removes common personal data and caps text before it leaves the page.
   const clean = (text) => String(text || "")
     .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[email]")
     .replace(/(?:\+?\d[\d ().-]{7,}\d)/g, "[phone]")
     .replace(/\b(?:\d[ -]*?){13,19}\b/g, "[card]")
     .slice(0, 20000);
+  // Reads trimmed text from all elements matching a CSS selector.
   const text = (selector) => {
     try { return [...document.querySelectorAll(selector)].map((node) => node.innerText?.trim()).filter(Boolean); }
     catch { return []; }
   };
+  // Collects review text and ratings using site-specific selectors.
   const collectReviews = (root, sels) => {
     if (sels?.reviewCard && sels?.reviewText) {
       const cards = [...root.querySelectorAll(sels.reviewCard)];
@@ -39,15 +43,20 @@
       return [...new Set([...root.querySelectorAll(sels?.reviews || "")].map((node) => node.innerText?.trim()).filter(Boolean))];
     } catch { return []; }
   };
+  // Returns the first text value found by a selector.
   const value = (selector) => text(selector)[0] || "";
+  // Reads a configured selector group such as specs or bullet points.
   const select = (sels, key) => sels?.[key] ? text(sels[key]) : [];
+  // Parses JSON-LD data embedded in the current page.
   const jsonData = () => [...document.querySelectorAll('script[type="application/ld+json"]')].flatMap((node) => {
     try {
       const parsed = JSON.parse(node.textContent);
       return Array.isArray(parsed) ? parsed : [parsed];
     } catch { return []; }
   }).slice(0, 30);
+  // Expands JSON-LD graph entries into a simple list.
   const flatten = (data) => data.flatMap((item) => Array.isArray(item?.['@graph']) ? item['@graph'] : [item]);
+  // Waits briefly for a requested page element to appear.
   const waitFor = (selector, timeout = 2500) => new Promise((resolve) => {
     if (document.querySelector(selector)) return resolve(true);
     const observer = new MutationObserver(() => {
@@ -56,6 +65,7 @@
     observer.observe(document.documentElement, { childList: true, subtree: true });
     setTimeout(() => { observer.disconnect(); resolve(false); }, timeout);
   });
+  // Identifies a supported site from the current hostname.
   const detectSite = () => {
     const host = location.hostname.toLowerCase();
     if (host.includes("amazon.")) return "amazon";
@@ -64,6 +74,7 @@
     if (host.includes("rottentomatoes.")) return "rottentomatoes";
     return host.replace(/^www\./, "") || "other";
   };
+  // Classifies the page as shopping, movie, article, or general content.
   const detectPageType = (site, data, sels) => {
     const all = flatten(data);
     if (all.some((x) => /product/i.test(String(x['@type'] || ""))) || (site === "amazon" || site === "flipkart") && (value(sels?.price) && (value(sels?.addToCart) || all.length))) return "shopping";
@@ -71,6 +82,7 @@
     if (all.some((x) => /article|newsarticle/i.test(String(x['@type'] || ""))) || (document.querySelector("article, main")?.innerText?.length || 0) > 1000) return "article";
     return "other";
   };
+  // Expands review sections and tries review links for additional excerpts.
   const loadMoreReviews = async (sels) => {
     const candidates = [...document.querySelectorAll("button, a")].filter((el) => /see more reviews|more reviews|load more/i.test(el.innerText || "")).slice(0, 2);
     for (const el of candidates) { el.scrollIntoView({ block: "center" }); el.click(); await new Promise((r) => setTimeout(r, 700)); }
@@ -86,6 +98,7 @@
       await new Promise((r) => setTimeout(r, 1000));
     }
   };
+  // Extracts page metadata, structured fields, reviews, and readable text.
   window.getPageData = async ({ moreReviews = false, debug = false } = {}) => {
     const site = detectSite();
     const sels = globalThis.PAGECHAT_SELECTORS?.[site] || {};

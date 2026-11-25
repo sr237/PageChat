@@ -19,6 +19,7 @@ _TOKEN_RE = re.compile(r"[a-z0-9]+", re.I)
 _STOP_WORDS = {"a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "how", "i", "in", "is", "it", "of", "on", "or", "that", "the", "this", "to", "was", "what", "when", "where", "which", "who", "why", "with"}
 
 
+# Combines extracted page fields into one searchable text document.
 def build_docs(payload):
     parts = []
     structured = payload.get("structured") or {}
@@ -44,11 +45,13 @@ def build_docs(payload):
     return Document(page_content=text, metadata={"url": payload.get("url", ""), "site": payload.get("site", "")})
 
 
+# Creates a stable key for caching chunks of a page document.
 def _cache_key(doc):
     content_hash = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
     return hashlib.sha256((doc.metadata.get("url", "") + content_hash).encode("utf-8")).hexdigest()
 
 
+# Splits a document into reusable overlapping text sections.
 def _get_chunks(doc):
     key = _cache_key(doc)
     with _CACHE_LOCK:
@@ -63,6 +66,7 @@ def _get_chunks(doc):
     return chunks
 
 
+# Scores page sections by question terms, with extra weight for negative reviews.
 def _rank_chunks(chunks, question, limit):
     query_terms = set(_TOKEN_RE.findall(question.lower())) - _STOP_WORDS
     if not query_terms:
@@ -85,6 +89,7 @@ def _rank_chunks(chunks, question, limit):
     return [item[2] for item in sorted(scored, reverse=True)[:limit]]
 
 
+# Selects the page sections most useful for answering or summarizing.
 def retrieve(doc, question, summarize=False):
     chunks = _get_chunks(doc)
     if summarize:
@@ -96,6 +101,7 @@ def retrieve(doc, question, summarize=False):
     return _rank_chunks(chunks, question, 4)
 
 
+# Connects LangChain to the locally running Ollama model.
 def _llm():
     from langchain_ollama import ChatOllama
     base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
@@ -119,6 +125,7 @@ def _llm():
     )
 
 
+# Builds model instructions, page context, and recent chat history.
 def _messages(payload, question, docs):
     from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
     from prompts import system_prompt
@@ -136,11 +143,13 @@ def _messages(payload, question, docs):
     return messages
 
 
+# Retrieves relevant page sections and streams an answer from Ollama.
 def stream_answer(payload, question, doc):
     docs = retrieve(doc, question)
     return _llm().stream(_messages(payload, question, docs))
 
 
+# Retrieves summary context and asks Ollama for a short page summary.
 def summarize(payload, doc):
     docs = retrieve(doc, "Summarize what is going on on this page", summarize=True)
     llm = _llm()

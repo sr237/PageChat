@@ -4,6 +4,7 @@ const BLOCKED_PATTERNS = [
 ];
 const ACTIVE_TAB_KEY = "pagechatActiveTabId";
 
+// Injects the page-reading scripts into a tab and returns extracted data.
 async function extractFromTab(tabId, options = {}) {
   try {
     await chrome.scripting.executeScript({
@@ -22,6 +23,7 @@ async function extractFromTab(tabId, options = {}) {
   }
 }
 
+// Opens the side panel for the clicked tab and remembers that tab's id.
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab?.id) return;
   const openPanel = chrome.sidePanel.open({ tabId: tab.id });
@@ -29,10 +31,12 @@ chrome.action.onClicked.addListener(async (tab) => {
   await Promise.all([openPanel, rememberTab]);
 });
 
+// Remembers whichever browser tab the user most recently selected.
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   chrome.storage.session.set({ [ACTIVE_TAB_KEY]: tabId });
 });
 
+// Handles page URL notifications and side-panel page-info/extraction requests.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("[PageChat] incoming message", message);
   if (message?.type === "URL_CHANGED") {

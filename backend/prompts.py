@@ -5,5 +5,6 @@ SYSTEM_PROMPTS = {
     "other": "Answer only from the supplied page content. If a detail is absent, say 'I could not find that on this page.' Keep the answer short and clear.",
 }
 
+# Chooses the assistant instructions that match the page category.
 def system_prompt(page_type: str) -> str:
     return SYSTEM_PROMPTS.get(page_type, SYSTEM_PROMPTS["other"])

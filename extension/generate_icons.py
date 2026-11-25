@@ -6,11 +6,13 @@ from pathlib import Path
 OUT = Path(__file__).parent / "icons"
 
 
+# Packages one PNG data block and calculates its checksum.
 def chunk(kind, data):
     body = kind + data
     return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
 
 
+# Chooses the icon pixel color for the chat bubble and its three dots.
 def pixel(x, y, size):
     pad = size * 0.12
     radius = size * 0.24
@@ -29,6 +31,7 @@ def pixel(x, y, size):
     return (0, 0, 0, 0)
 
 
+# Draws the icon at one size and writes it as a PNG file.
 def write_png(size):
     rows = []
     for y in range(size):

@@ -1,3 +1,4 @@
+// Finds a side panel element by its HTML id.
 const $ = (id) => document.getElementById(id);
 const chat = $("chat"), chips = $("chips"), question = $("question");
 document.documentElement.dataset.theme = "cred";
@@ -7,7 +8,9 @@ let startupReady = Promise.resolve();
 let messages = [];
 const defaultBackend = "http://localhost:8000";
 
+// Escapes HTML characters so page or model text is rendered safely.
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+// Converts the small supported Markdown subset into displayable HTML.
 const formatMarkdown = (value) => {
   const lines = escapeHtml(value).split("\n");
   let inList = false, html = "";
@@ -24,10 +27,14 @@ const formatMarkdown = (value) => {
   if (inList) html += "</ul>";
   return html;
 };
+// Keeps the newest chat message visible.
 const scrollBottom = () => { chat.scrollTop = chat.scrollHeight; };
+// Removes the welcome message when the first real message is added.
 const removeEmpty = () => chat.querySelector(".empty-state")?.remove();
+// Creates a separate session-storage key for each page URL.
 const storageKey = () => `pagechat:${activeUrl}`;
 
+// Adds a user or assistant message to the chat and returns its elements.
 function addMessage(role, content, { error = false, retry = false } = {}) {
   removeEmpty();
   const row = document.createElement("div");
@@ -62,10 +69,12 @@ function addMessage(role, content, { error = false, retry = false } = {}) {
   return { row, bubble };
 }
 
+// Saves the current page's recent chat messages in this browser session.
 async function saveMessages() {
   if (!activeUrl) return;
   await chrome.storage.session.set({ [storageKey()]: messages.slice(-60) });
 }
+// Loads this page's saved conversation or shows the welcome message.
 async function loadMessages() {
   messages = activeUrl ? (await chrome.storage.session.get(storageKey()))[storageKey()] || [] : [];
   chat.replaceChildren();
@@ -75,11 +84,14 @@ async function loadMessages() {
     for (const item of messages) addMessage(item.role, item.content, { error: item.error });
   }
 }
+// Updates the small page-status label in the panel header.
 function setStatus(text) { $("page-chip").textContent = text; }
+// Reads the saved backend address or uses the local default.
 async function backendUrl() {
   const value = (await chrome.storage.local.get("backendUrl")).backendUrl;
   return (value || defaultBackend).replace(/\/$/, "");
 }
+// Shows quick-question buttons suited to the detected page type.
 function updateChips() {
   const type = page?.page_type || "other";
   setStatus(page ? `${page.site} · ${type}` : (activeUrl ? "Ready when you are" : "No active page"));
@@ -98,6 +110,7 @@ function updateChips() {
   }
 }
 
+// Requests readable page data from the background script and caches it.
 async function extract(force = false, tabId = null, includeMoreReviews = $("more-reviews").checked) {
   await syncActivePage(tabId);
   if (page && !force && (!includeMoreReviews || pageIncludesMoreReviews)) return page;
@@ -121,12 +134,14 @@ async function extract(force = false, tabId = null, includeMoreReviews = $("more
   return page;
 }
 
+// Finds the selected browser tab, preferring the last focused window.
 async function getActiveTab() {
   let [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (!tab?.id) [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return tab;
 }
 
+// Gets the active page URL and loads its page-specific chat history.
 async function syncActivePage(tabId = null) {
   const tab = tabId ? await chrome.tabs.get(tabId) : await getActiveTab();
   if (!tab?.id) throw new Error("I can’t find the active tab. Open a webpage, then reopen PageChat from that tab.");
@@ -158,9 +173,11 @@ async function syncActivePage(tabId = null) {
   }
 }
 
+// Prepares a short recent conversation history to send with a question.
 function historyForRequest() {
   return messages.slice(0, -1).slice(-6).map(({ role, content }) => ({ role, content: content.slice(0, 3000) }));
 }
+// Sends the user's question and extracted page context to the backend.
 async function ask(rawQuestion) {
   const asked = String(rawQuestion || "").trim();
   if (!asked || busy) return;
@@ -260,6 +277,7 @@ async function ask(rawQuestion) {
   }
 }
 
+// Saves the current product and displays it alongside the previous one.
 async function compareCurrent() {
   try {
     const data = await extract();
@@ -288,32 +306,42 @@ async function compareCurrent() {
   } catch (error) { addMessage("bot", error.message, { error: true }); }
 }
 
+// Resizes the question box to fit its text, up to a fixed maximum height.
 function resizeInput() { question.style.height = "auto"; question.style.height = `${Math.min(question.scrollHeight, 120)}px`; }
+// Updates the send button and input height as the user types.
 question.addEventListener("input", () => {
   resizeInput();
   $("send").disabled = !question.value.trim() || busy;
 });
+// Sends the question when Enter is pressed without Shift.
 question.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); ask(question.value); }
 });
+// Starts a chat request when the user clicks Send.
 $("send").addEventListener("click", () => ask(question.value));
+// Cancels the current backend request when Stop is clicked.
 $("stop").addEventListener("click", () => controller?.abort());
+// Re-extracts the current page when the refresh button is clicked.
 $("refresh").addEventListener("click", async () => {
   page = null;
   try { await extract(true); addMessage("bot", "Page data refreshed. Ask away."); }
   catch (error) { setStatus("Could not read page"); addMessage("bot", error.message, { error: true }); }
 });
+// Opens settings and displays the currently configured backend address.
 $("settings").addEventListener("click", async () => {
   $("settings-row").hidden = !$("settings-row").hidden;
   $("backend-url").value = await backendUrl();
 });
+// Saves the backend address entered in the settings row.
 $("save-settings").addEventListener("click", async () => {
   const value = $("backend-url").value.trim().replace(/\/$/, "");
   if (value) await chrome.storage.local.set({ backendUrl: value });
   $("settings-row").hidden = true;
 });
+// Clears this page's saved chat and restores the welcome display.
 $("clear-chat").addEventListener("click", async () => { messages = []; await chrome.storage.session.remove(storageKey()); await loadMessages(); });
 
+// Synchronizes the panel's page state when the active tab changes.
 async function updateActiveTab() {
   const tab = await getActiveTab();
   currentTabId = tab?.id || null;
@@ -325,6 +353,7 @@ async function updateActiveTab() {
   updateChips();
 }
 let deferredAutoRefreshTab = null;
+// Refreshes extracted page data when a tab loads or its URL changes.
 async function refreshPageForTab(tabId, force = false) {
   if (!tabId) return;
   if (busy) {
@@ -344,16 +373,20 @@ async function refreshPageForTab(tabId, force = false) {
   }
 }
 
+// Refreshes the panel after the user activates another browser tab.
 chrome.tabs.onActivated.addListener(({ tabId }) => { refreshPageForTab(tabId); });
+// Re-extracts page data when the active tab finishes loading.
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (tabId === currentTabId && changeInfo.status === "complete") refreshPageForTab(tabId, true);
 });
+// Handles notifications that a page changed its URL without reloading.
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type !== "ACTIVE_PAGE_CHANGED" || !message.tabId) return;
   getActiveTab().then((tab) => {
     if (tab?.id === message.tabId) refreshPageForTab(message.tabId, true);
   });
 });
+// Initializes the selected tab, backend setting, and page extraction.
 startupReady = (async () => {
   await updateActiveTab();
   const stored = await chrome.storage.local.get("backendUrl");
